@@ -44,6 +44,7 @@ class PipeWrap : public StreamWrap {
   static void Listen(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Connect(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void ReadConnections(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 #ifdef _WIN32
   static void SetPendingInstances(

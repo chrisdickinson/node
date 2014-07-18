@@ -51,6 +51,7 @@ class TCPWrap : public StreamWrap {
   static void Connect(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Connect6(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void ReadConnections(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 #ifdef _WIN32
   static void SetSimultaneousAccepts(

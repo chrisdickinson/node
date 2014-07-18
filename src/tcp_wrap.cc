@@ -36,6 +36,7 @@
 
 namespace node {
 
+using v8::Array;
 using v8::Context;
 using v8::EscapableHandleScope;
 using v8::Function;
@@ -110,6 +111,7 @@ void TCPWrap::Initialize(Handle<Object> target,
   NODE_SET_PROTOTYPE_METHOD(t, "getpeername", GetPeerName);
   NODE_SET_PROTOTYPE_METHOD(t, "setNoDelay", SetNoDelay);
   NODE_SET_PROTOTYPE_METHOD(t, "setKeepAlive", SetKeepAlive);
+  NODE_SET_PROTOTYPE_METHOD(t, "readConnections", ReadConnections);
 
 #ifdef _WIN32
   NODE_SET_PROTOTYPE_METHOD(t,
@@ -307,6 +309,49 @@ void TCPWrap::Listen(const FunctionCallbackInfo<Value>& args) {
 }
 
 
+void TCPWrap::ReadConnections(const v8::FunctionCallbackInfo<v8::Value>& args) {
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  HandleScope scope(env->isolate());
+
+  TCPWrap* server_wrap = Unwrap<TCPWrap>(args.Holder());
+
+  int num = args[0]->Int32Value();
+  int i = 0;
+
+  fprintf(stderr, "TCPWrap::ReadConnections %d\n", num);
+  Local<Array> connections = Array::New(env->isolate());
+
+  do {
+    Local<Object> client_obj = Instantiate(env);
+
+    // Unwrap the client javascript object.
+    TCPWrap* wrap = Unwrap<TCPWrap>(client_obj);
+    uv_stream_t* client_handle = reinterpret_cast<uv_stream_t*>(&wrap->handle_);
+    uv_stream_t* server_handle = reinterpret_cast<uv_stream_t*>(&server_wrap->handle_);
+    int retval = uv_accept(server_handle, client_handle);
+
+    // we're done reading this batch of connnections
+    if (retval == -EAGAIN) {
+      fprintf(stderr, "TCPWrap::ReadConnections empty!\n");
+      break;
+    }
+
+    // an error occurred with this socket, so we're going
+    // to just... ignore it.
+    if (retval) {
+      fprintf(stderr, "TCPWrap::ReadConnections error %s\n", uv_strerror(retval));
+      continue;
+    }
+
+    fprintf(stderr, "TCPWrap::ReadConnections create %d\n", i);
+    connections->Set(i, client_obj);
+    ++i;
+  } while(i < num);
+
+  args.GetReturnValue().Set(connections);
+}
+
+
 void TCPWrap::OnConnection(uv_stream_t* handle, int status) {
   TCPWrap* tcp_wrap = static_cast<TCPWrap*>(handle->data);
   assert(&tcp_wrap->handle_ == reinterpret_cast<uv_tcp_t*>(handle));
@@ -324,6 +369,7 @@ void TCPWrap::OnConnection(uv_stream_t* handle, int status) {
     Undefined(env->isolate())
   };
 
+  /*
   if (status == 0) {
     // Instantiate the client javascript object and handle.
     Local<Object> client_obj = Instantiate(env);
@@ -336,7 +382,7 @@ void TCPWrap::OnConnection(uv_stream_t* handle, int status) {
 
     // Successful accept. Call the onconnection callback in JavaScript land.
     argv[1] = client_obj;
-  }
+  }*/
 
   tcp_wrap->MakeCallback(env->onconnection_string(), ARRAY_SIZE(argv), argv);
 }

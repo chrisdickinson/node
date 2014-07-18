@@ -34,6 +34,7 @@
 
 namespace node {
 
+using v8::Array;
 using v8::Boolean;
 using v8::Context;
 using v8::EscapableHandleScope;
@@ -182,6 +183,49 @@ void PipeWrap::Listen(const FunctionCallbackInfo<Value>& args) {
 }
 
 
+void PipeWrap::ReadConnections(const v8::FunctionCallbackInfo<v8::Value>& args) {
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  HandleScope scope(env->isolate());
+
+  PipeWrap* server_wrap = Unwrap<PipeWrap>(args.Holder());
+
+  int num = args[0]->Int32Value();
+  int i = 0;
+
+  fprintf(stderr, "PipeWrap::ReadConnections %d\n", num);
+  Local<Array> connections = Array::New(env->isolate());
+
+  do {
+    Local<Object> client_obj = Instantiate(env);
+
+    // Unwrap the client javascript object.
+    PipeWrap* wrap = Unwrap<PipeWrap>(client_obj);
+    uv_stream_t* client_handle = reinterpret_cast<uv_stream_t*>(&wrap->handle_);
+    uv_stream_t* server_handle = reinterpret_cast<uv_stream_t*>(&server_wrap->handle_);
+    int retval = uv_accept(server_handle, client_handle);
+
+    // we're done reading this batch of connnections
+    if (retval == -EAGAIN) {
+      fprintf(stderr, "PipeWrap::ReadConnections empty!\n");
+      break;
+    }
+
+    // an error occurred with this socket, so we're going
+    // to just... ignore it.
+    if (retval) {
+      fprintf(stderr, "PipeWrap::ReadConnections error %s\n", uv_strerror(retval));
+      continue;
+    }
+
+    fprintf(stderr, "PipeWrap::ReadConnections create %d\n", i);
+    connections->Set(i, client_obj);
+    ++i;
+  } while(i < num);
+
+  args.GetReturnValue().Set(connections);
+}
+
+
 // TODO(bnoordhuis) maybe share with TCPWrap?
 void PipeWrap::OnConnection(uv_stream_t* handle, int status) {
   PipeWrap* pipe_wrap = static_cast<PipeWrap*>(handle->data);
@@ -205,6 +249,7 @@ void PipeWrap::OnConnection(uv_stream_t* handle, int status) {
     return;
   }
 
+  /*
   // Instanciate the client javascript object and handle.
   Local<Object> client_obj = Instantiate(env);
 
@@ -216,6 +261,8 @@ void PipeWrap::OnConnection(uv_stream_t* handle, int status) {
 
   // Successful accept. Call the onconnection callback in JavaScript land.
   argv[1] = client_obj;
+  */
+
   pipe_wrap->MakeCallback(env->onconnection_string(), ARRAY_SIZE(argv), argv);
 }
 
