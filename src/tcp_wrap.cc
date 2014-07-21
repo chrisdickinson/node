@@ -332,7 +332,7 @@ void TCPWrap::ReadConnections(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     // we're done reading this batch of connnections
     if (retval == -EAGAIN) {
-      fprintf(stderr, "TCPWrap::ReadConnections empty!\n");
+      fprintf(stderr, "TCPWrap::ReadConnections empty after %d!\n", i);
       break;
     }
 
@@ -357,6 +357,8 @@ void TCPWrap::OnConnection(uv_stream_t* handle, int status) {
   assert(&tcp_wrap->handle_ == reinterpret_cast<uv_tcp_t*>(handle));
   Environment* env = tcp_wrap->env();
 
+  static int numConnections = 0;
+
   HandleScope handle_scope(env->isolate());
   Context::Scope context_scope(env->context());
 
@@ -369,6 +371,7 @@ void TCPWrap::OnConnection(uv_stream_t* handle, int status) {
     Undefined(env->isolate())
   };
 
+  fprintf(stderr, "TCPWrap::OnConnection %d\n", numConnections++);
   /*
   if (status == 0) {
     // Instantiate the client javascript object and handle.
